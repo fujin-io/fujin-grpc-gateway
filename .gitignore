@@ -27,6 +27,15 @@ go.work.sum
 # env file
 .env
 
+# Generated code
+gen/
+
+# Build output
+bin/
+*.exe
+
 # Editor/IDE
 # .idea/
 # .vscode/
+
+buf.lock
