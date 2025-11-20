@@ -1,3 +1,11 @@
-addr: :8080
+addr: :4850
+# tls:
+#   enabled: true
+#   server_cert_pem_path: /path/to/cert.pem
+#   server_key_pem_path: /path/to/key.pem
 grpc:
   addr: :4849
+# tls:
+#   enabled: true
+#   server_cert_pem_path: /path/to/cert.pem
+#   server_key_pem_path: /path/to/key.pem

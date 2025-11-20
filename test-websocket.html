@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fujin gRPC Gateway WebSocket Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .controls {
+            margin-bottom: 15px;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            cursor: pointer;
+            border: 1px solid #333;
+            border-radius: 3px;
+            background: #f0f0f0;
+        }
+        button:hover {
+            background: #e0e0e0;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        input {
+            padding: 5px;
+            margin: 5px;
+            width: 200px;
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status.connecting {
+            background: #fff3cd;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fujin gRPC Gateway WebSocket Test</h1>
+    
+    <div class="controls">
+        <label>Server URL:</label>
+        <input type="text" id="serverUrl" value="ws://localhost:4850/stream" placeholder="ws://localhost:4850/stream">
+        <button id="connectBtn" onclick="connect()">Connect</button>
+        <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+        <button onclick="sendInit()">Send Init</button>
+        <button onclick="sendProduce()">Send Produce</button>
+        <button onclick="sendSubscribe()">Send Subscribe</button>
+    </div>
+
+    <div id="status" class="status disconnected">Disconnected</div>
+
+    <div class="container">
+        <div class="panel">
+            <h3>Send Messages</h3>
+            <textarea id="sendArea" placeholder='Enter JSON message here, e.g.:
+{
+  "init": {
+    "config_overrides": {}
+  }
+}
+
+or
+
+{
+  "produce": {
+    "correlation_id": 1,
+    "topic": "test-topic",
+    "message": "SGVsbG8gV29ybGQ="
+  }
+}
+
+or
+
+{
+  "subscribe": {
+    "correlation_id": 2,
+    "topic": "test-topic",
+    "auto_commit": true
+  }
+}'></textarea>
+            <button onclick="sendCustom()">Send Custom Message</button>
+        </div>
+
+        <div class="panel">
+            <h3>Received Messages</h3>
+            <textarea id="receiveArea" readonly></textarea>
+            <button onclick="clearMessages()">Clear</button>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let messageId = 1;
+
+        function updateStatus(status, text) {
+            const statusEl = document.getElementById('status');
+            statusEl.className = 'status ' + status;
+            statusEl.textContent = text;
+        }
+
+        function connect() {
+            const url = document.getElementById('serverUrl').value;
+            if (!url) {
+                alert('Please enter server URL');
+                return;
+            }
+
+            updateStatus('connecting', 'Connecting...');
+            
+            try {
+                ws = new WebSocket(url);
+                
+                ws.onopen = function() {
+                    updateStatus('connected', 'Connected');
+                    document.getElementById('connectBtn').disabled = true;
+                    document.getElementById('disconnectBtn').disabled = false;
+                    addMessage('System', 'Connected to ' + url);
+                };
+
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        addMessage('Received', JSON.stringify(data, null, 2));
+                    } catch (e) {
+                        addMessage('Received (raw)', event.data);
+                    }
+                };
+
+                ws.onerror = function(error) {
+                    addMessage('Error', 'WebSocket error: ' + error);
+                    updateStatus('disconnected', 'Error occurred');
+                };
+
+                ws.onclose = function() {
+                    updateStatus('disconnected', 'Disconnected');
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('disconnectBtn').disabled = true;
+                    addMessage('System', 'Connection closed');
+                    ws = null;
+                };
+            } catch (e) {
+                alert('Failed to connect: ' + e.message);
+                updateStatus('disconnected', 'Connection failed');
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+        }
+
+        function sendMessage(message) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected. Please connect first.');
+                return;
+            }
+
+            try {
+                const jsonStr = JSON.stringify(message);
+                ws.send(jsonStr);
+                addMessage('Sent', jsonStr);
+            } catch (e) {
+                alert('Failed to send message: ' + e.message);
+            }
+        }
+
+        function sendInit() {
+            sendMessage({
+                init: {
+                    config_overrides: {}
+                }
+            });
+        }
+
+        function sendProduce() {
+            const topic = prompt('Enter topic name:', 'test-topic');
+            if (!topic) return;
+            
+            const message = prompt('Enter message (will be base64 encoded):', 'Hello World');
+            if (message === null) return;
+
+            const base64Message = btoa(unescape(encodeURIComponent(message)));
+            
+            sendMessage({
+                produce: {
+                    correlation_id: messageId++,
+                    topic: topic,
+                    message: base64Message
+                }
+            });
+        }
+
+        function sendSubscribe() {
+            const topic = prompt('Enter topic name:', 'test-topic');
+            if (!topic) return;
+            
+            const autoCommit = confirm('Enable auto commit?');
+            
+            sendMessage({
+                subscribe: {
+                    correlation_id: messageId++,
+                    topic: topic,
+                    auto_commit: autoCommit
+                }
+            });
+        }
+
+        function sendCustom() {
+            const text = document.getElementById('sendArea').value;
+            if (!text) {
+                alert('Please enter a message');
+                return;
+            }
+
+            try {
+                const message = JSON.parse(text);
+                sendMessage(message);
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+            }
+        }
+
+        function addMessage(type, message) {
+            const area = document.getElementById('receiveArea');
+            const timestamp = new Date().toLocaleTimeString();
+            area.value += `[${timestamp}] ${type}:\n${message}\n\n`;
+            area.scrollTop = area.scrollHeight;
+        }
+
+        function clearMessages() {
+            document.getElementById('receiveArea').value = '';
+        }
+    </script>
+</body>
+</html>
+
+

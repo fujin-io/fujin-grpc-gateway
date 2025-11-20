@@ -29,12 +29,12 @@ BINARY := $(BIN_DIR)$(PATHSEP)$(APP_NAME)$(BINARY_EXT)
 .PHONY: generate
 generate:
 	@echo "==> Downloading and generating gRPC Gateway code..."
-ifeq ($(OS),Windows_NT)
-	@powershell -Command "New-Item -ItemType Directory -Force -Path 'internal/v1' | Out-Null; Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/fujin-io/fujin/$(VERSION)/public/proto/grpc/v1/fujin-grpc-gateway.proto' -OutFile 'internal/v1/fujin-grpc-gateway.proto'"
-else
-	@mkdir -p internal/v1
-	@curl -sSL "https://raw.githubusercontent.com/fujin-io/fujin/$(VERSION)/public/proto/grpc/v1/fujin-grpc-gateway.proto" -o internal/v1/fujin-grpc-gateway.proto
-endif
+# ifeq ($(OS),Windows_NT)
+# 	@powershell -Command "New-Item -ItemType Directory -Force -Path 'internal/v1' | Out-Null; Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/fujin-io/fujin/refs/heads/${VERSION}/public/proto/grpc/v1/fujin-grpc-gateway.proto' -OutFile 'internal/v1/fujin-grpc-gateway.proto'"
+# else
+# 	@mkdir -p internal/v1 
+# 	@curl -sSL "https://raw.githubusercontent.com/fujin-io/fujin/refs/heads/${VERSION}/public/proto/grpc/v1/fujin-grpc-gateway.proto" -o internal/v1/fujin-grpc-gateway.proto
+# endif
 	@cd internal/v1 && buf dep update && buf generate --template ../../buf.gen.yaml . && cd ../..
 
 .PHONY: build

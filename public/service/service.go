@@ -69,8 +69,12 @@ func loadConfig(filePath string, cfg *config.Config) error {
 				return fmt.Errorf("unmarshal config: %w", err)
 			}
 
-			if err := cfg.GRPC.TLS.Parse(); err != nil {
+			if err := cfg.TLS.Parse(); err != nil {
 				return fmt.Errorf("parse tls config: %w", err)
+			}
+
+			if err := cfg.GRPC.TLS.Parse(); err != nil {
+				return fmt.Errorf("parse grpc tls config: %w", err)
 			}
 
 			return nil

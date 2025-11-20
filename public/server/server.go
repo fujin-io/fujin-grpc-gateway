@@ -11,6 +11,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/tmc/grpc-websocket-proxy/wsproxy"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -25,28 +26,50 @@ func NewServer(conf config.Config, l *slog.Logger) *Server {
 
 func (s *Server) ListenAndServe(ctx context.Context) error {
 	mux := runtime.NewServeMux()
+
+	grpcOptions := []grpc.DialOption{}
+	if s.conf.TLS.Enabled {
+		grpcOptions = append(grpcOptions, grpc.WithTransportCredentials(credentials.NewTLS(s.conf.TLS.Config)))
+	} else {
+		grpcOptions = append(grpcOptions, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+
 	err := v1.RegisterFujinServiceHandlerFromEndpoint(ctx, mux, s.conf.GRPC.Addr,
-		[]grpc.DialOption{
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		},
+		grpcOptions,
 	)
 	if err != nil {
 		return fmt.Errorf("register fujin service handler from endpoint: %w", err)
 	}
 
+	handler := wsproxy.WebsocketProxy(mux, wsproxy.WithRequestMutator(func(incoming *http.Request, outgoing *http.Request) *http.Request {
+		if outgoing.Method == http.MethodGet {
+			outgoing.Method = http.MethodPost
+		}
+		return outgoing
+	}))
+
 	srv := http.Server{
 		Addr:    s.conf.Addr,
-		Handler: wsproxy.WebsocketProxy(mux),
+		Handler: handler,
 	}
 
 	go func() {
-		if err := srv.ListenAndServe(); err != nil {
-			if err != http.ErrServerClosed {
-				s.l.Error("listen and serve", "error", err)
+		var err error
+		if s.conf.TLS.Enabled {
+			if s.conf.TLS.Config != nil {
+				srv.TLSConfig = s.conf.TLS.Config
 			}
+			certFile := s.conf.TLS.ServerCertPEMPath
+			keyFile := s.conf.TLS.ServerKeyPEMPath
+			err = srv.ListenAndServeTLS(certFile, keyFile)
+		} else {
+			err = srv.ListenAndServe()
+		}
+		if err != nil && err != http.ErrServerClosed {
+			s.l.Error("listen and serve", "error", err)
 		}
 	}()
-	s.l.Info("fujin grpc gateway server started")
+	s.l.Info("fujin grpc gateway server started", "addr", s.conf.Addr)
 	<-ctx.Done()
 	srv.Shutdown(ctx)
 	s.l.Info("fujin grpc gateway server stopped")
