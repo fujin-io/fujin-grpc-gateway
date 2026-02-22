@@ -21,14 +21,16 @@ const ws = new WebSocket(url);
 ws.on('open', function open() {
     console.log('Connected!');
     
-    // Send Init request
-    const initMessage = {
-        init: {
+    // Send Bind request
+    const bindMessage = {
+        bind: {
+            connector: "",
+            meta: {},
             config_overrides: {}
         }
     };
-    console.log('\nSending Init:', JSON.stringify(initMessage, null, 2));
-    ws.send(JSON.stringify(initMessage));
+    console.log('\nSending Init:', JSON.stringify(bindMessage, null, 2));
+    ws.send(JSON.stringify(bindMessage));
     
     // Example: Send Produce request after 1 second
     setTimeout(() => {

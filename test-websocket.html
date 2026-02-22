@@ -80,7 +80,7 @@
         <input type="text" id="serverUrl" value="ws://localhost:4850/stream" placeholder="ws://localhost:4850/stream">
         <button id="connectBtn" onclick="connect()">Connect</button>
         <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
-        <button onclick="sendInit()">Send Init</button>
+        <button onclick="sendBind()">Send Bind</button>
         <button onclick="sendProduce()">Send Produce</button>
         <button onclick="sendSubscribe()">Send Subscribe</button>
     </div>
@@ -92,7 +92,9 @@
             <h3>Send Messages</h3>
             <textarea id="sendArea" placeholder='Enter JSON message here, e.g.:
 {
-  "init": {
+  "bind": {
+    "connector": "kafka",
+    "meta": {},
     "config_overrides": {}
   }
 }
@@ -203,9 +205,14 @@ or
             }
         }
 
-        function sendInit() {
+        function sendBind() {
+            const connector = prompt('Enter connector name:', 'connector');
+            if (!connector) return;
+
             sendMessage({
-                init: {
+                bind: {
+                    connector: connector,
+                    meta: {},
                     config_overrides: {}
                 }
             });

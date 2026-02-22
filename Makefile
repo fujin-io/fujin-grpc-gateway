@@ -1,7 +1,7 @@
 APP_NAME := fujin-grpc-gateway
 
 ifeq ($(OS),Windows_NT)
-	VERSION ?= v0.1.7
+	VERSION ?= v0.1.10
 else
 VERSION ?= $(shell cat VERSION 2>/dev/null | head -n 1 | tr -d '\r\n' || echo "")
 endif
